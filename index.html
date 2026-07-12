@@ -26,17 +26,18 @@
       <div class="depth" id="depthReadout">-- m</div>
     </div>
 
-    <!-- Left movement pad -->
-    <div id="movePad" class="pad">
-      <button class="btn dir" data-move="left"  aria-label="left">◀</button>
-      <button class="btn jump" data-move="jump" aria-label="jump">▲<span>JUMP</span></button>
-      <button class="btn dir" data-move="right" aria-label="right">▶</button>
+    <!-- Left movement joystick: drag left/right to move, push up to jump/climb -->
+    <div id="moveStick" class="stick" aria-label="move">
+      <div class="stick-ticks move"></div>
+      <div class="nub"></div>
+      <span class="stick-cap">MOVE ◀▶ · ▲</span>
     </div>
 
-    <!-- Right hose pad: 8 directional spray buttons in a ring -->
-    <div id="hosePad" class="pad">
-      <div class="ring" id="hoseRing"></div>
-      <div class="hose-core">HOSE</div>
+    <!-- Right hose joystick: drag in any direction to aim & fire (full 360°) -->
+    <div id="hoseStick" class="stick hose" aria-label="hose">
+      <div class="stick-ticks"></div>
+      <div class="nub hose-nub"></div>
+      <span class="stick-cap">HOSE</span>
     </div>
 
     <!-- Overlays -->
@@ -47,8 +48,8 @@
            water hose, carve tunnels in 8 directions, dodge the hazards, and
            ride the rising water to the surface — before it drowns you.</p>
         <ul class="hints">
-          <li><b>Move / Jump</b> — left circle pad (or A / D / W)</li>
-          <li><b>Aim &amp; spray hose</b> — right ring, hold a direction (or hold Mouse / Arrow keys)</li>
+          <li><b>Move / Climb</b> — left stick: drag ◀ ▶, push ▲ to jump &amp; climb (or A / D / W)</li>
+          <li><b>Aim &amp; spray hose</b> — right stick: drag any direction to fire (or Mouse / Arrow keys)</li>
           <li>Water drains through <b>drains</b> — but <b>clogged</b> ones make it rise</li>
           <li>Watch for <b>rocks, gas, rodents</b> &amp; hidden cavities</li>
           <li>Submerged too long &rarr; you run out of <b>AIR</b></li>

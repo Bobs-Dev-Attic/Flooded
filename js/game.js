@@ -73,8 +73,8 @@ let seen   = new Uint8Array(COLS*ROWS);     // fog-of-war: hazards hidden till d
 
 let player, rodents, particles, spawnPoints;
 let oxygen, health, running, ended, startDepth, best;
-let sprayDir = null;      // active DIRS entry or null
-let sprayFromKey = false; // arrow-key spray latch
+let spraying = false;     // is the hose firing?
+let aimAngle = -Math.PI/2;// hose direction in radians (free 360°); default = up
 let shakeT = 0;
 
 const isSolid = t => t===DIRT || t===ROCK || t===CLOG || t===BEDROCK;
@@ -110,12 +110,11 @@ function generate(){
   // side walls of bedrock so water can't leak past edges awkwardly
   for(let y=0;y<ROWS;y++){ grid[IDX(0,y)]=BEDROCK; grid[IDX(COLS-1,y)]=BEDROCK; }
 
-  // starting pocket near the bottom — kept narrow so you can brace & climb out
-  const startX = COLS>>1, startY = ROWS-6;
-  carveDisc(startX, startY, 1.8, AIR);
-  carveDisc(startX, startY-1, 1.6, AIR);
-  // solid ledge to stand on
-  for(let x=startX-3;x<=startX+3;x++){ if(x>0&&x<COLS-1){ grid[IDX(x,startY+2)]=DIRT; integ[IDX(x,startY+2)]=1.6; } }
+  // starting chamber coordinates — actually carved clean further below (after all
+  // hazards) so nothing ever spawns inside it and the player never starts wedged.
+  const startX = COLS>>1;
+  const floorRow = ROWS-4;
+  const startY = floorRow;
 
   // scatter rock clusters (kept sparse enough to always leave a diggable route up)
   const rocks = 16;
@@ -151,17 +150,25 @@ function generate(){
     }
   }
 
-  // player
+  // carve the roomy, clean starting chamber last, so no rock/gas/cavity intrudes
+  // and the player spawns fully in open air (never wedged — horizontal move works)
+  for(let y=floorRow-4; y<=floorRow-1; y++)
+    for(let x=startX-2; x<=startX+2; x++)
+      if(x>0 && x<COLS-1){ const i=IDX(x,y); grid[i]=AIR; gas[i]=0; water[i]=0; }
+  for(let x=startX-3; x<=startX+3; x++)
+    if(x>0 && x<COLS-1){ grid[IDX(x,floorRow)]=DIRT; integ[IDX(x,floorRow)]=2.0; }
+
+  // player — feet resting on the chamber floor
   player = {
-    x:startX-P_W/2, y:startY-P_H, vx:0, vy:0,
-    onGround:false, inWater:false, face:1, wet:0,
+    x:startX-P_W/2, y:floorRow-P_H, vx:0, vy:0,
+    onGround:true, inWater:false, face:1, wet:0,
   };
-  oxygen=1; health=1; running=true; ended=false; sprayDir=null; sprayFromKey=false;
+  oxygen=1; health=1; running=true; ended=false; spraying=false;
   startDepth = depthMeters();
 
-  // reveal the sky band and the starting pocket; the rest grows as you dig
+  // reveal the sky band and the starting chamber; the rest grows as you dig
   for(let y=0;y<=SURFACE_ROWS;y++) for(let x=0;x<COLS;x++) seen[IDX(x,y)]=1;
-  for(let y=startY-4;y<=startY+3;y++) for(let x=startX-4;x<=startX+4;x++)
+  for(let y=floorRow-5;y<=floorRow;y++) for(let x=startX-5;x<=startX+5;x++)
     if(x>0&&x<COLS-1&&y>0&&y<ROWS-1) seen[IDX(x,y)]=1;
 }
 
@@ -316,12 +323,10 @@ function erodeAt(cx, cy){
   return dugAny;
 }
 function doSpray(){
-  const dir = sprayDir;
-  if(!dir || !running) return;
-  player.face = dir.dx!==0 ? Math.sign(dir.dx) : player.face;
+  if(!spraying || !running) return;
+  const ux=Math.cos(aimAngle), uy=Math.sin(aimAngle);   // free 360° aim
+  if(Math.abs(ux)>0.2) player.face = Math.sign(ux);
   const n=nozzle();
-  const len=Math.hypot(dir.dx,dir.dy);
-  const ux=dir.dx/len, uy=dir.dy/len;
   let hitSolid=false, tip=n;
   for(let s=0.6; s<=STREAM_LEN; s+=0.5){
     const px=n.x+ux*s, py=n.y+uy*s;
@@ -390,7 +395,9 @@ function gasAtHead(){
 // is the player braced inside the tunnel network (something solid to grip)?
 function nearWall(){
   const cx=player.x+P_W/2, cy=player.y+P_H/2;
-  const pts=[[-1.5,-0.6],[1.5,-0.6],[-1.5,0.6],[1.5,0.6],[0,-1.7],[-1.2,-1.5],[1.2,-1.5]];
+  // forgiving reach so any normal-width dug shaft (and the start chamber) can be
+  // braced & climbed; only genuinely wide-open caverns leave nothing to grip.
+  const pts=[[-2.4,-0.6],[2.4,-0.6],[-2.4,0.6],[2.4,0.6],[0,-1.8],[-2.0,-1.6],[2.0,-1.6]];
   for(const [ox,oy] of pts) if(solidAt(cx+ox, cy+oy)) return true;
   return false;
 }
@@ -757,14 +764,13 @@ function drawPlayer(){
   ctx.fillStyle='rgba(180,240,255,.7)';
   ctx.beginPath(); ctx.arc(px+w/2+player.face*w*0.18, py+h*0.22, w*0.09, 0, Math.PI*2); ctx.fill();
 
-  // hose held toward current aim
+  // hose held toward current aim (free 360°)
   const n=nozzle();
-  const aim = sprayDir || DIRS[player.face>0?2:6];
-  const len=Math.hypot(aim.dx,aim.dy);
-  const ex=n.x+aim.dx/len*1.4, ey=n.y+aim.dy/len*1.4;
+  const ax = spraying ? aimAngle : (player.face>0?0:Math.PI);
+  const ex=n.x+Math.cos(ax)*1.4, ey=n.y+Math.sin(ax)*1.4;
   ctx.strokeStyle='#222'; ctx.lineWidth=Math.max(2,CELL*0.35); ctx.lineCap='round';
   ctx.beginPath(); ctx.moveTo(px+w/2, py+h*0.5); ctx.lineTo(ex*CELL, ey*CELL); ctx.stroke();
-  ctx.strokeStyle='#39c6ff'; ctx.lineWidth=Math.max(1,CELL*0.16);
+  ctx.strokeStyle=spraying?'#7fe8ff':'#39c6ff'; ctx.lineWidth=Math.max(1,CELL*0.16);
   ctx.beginPath(); ctx.moveTo(px+w/2, py+h*0.5); ctx.lineTo(ex*CELL, ey*CELL); ctx.stroke();
 
   // oxygen bubbles when submerged
@@ -812,53 +818,67 @@ function startGame(){
 /* ------------------------------------------------------------------ */
 /*  Input — touch pads                                                */
 /* ------------------------------------------------------------------ */
-function bindHold(el, on, off){
-  const start=e=>{ e.preventDefault(); el.classList.add('on'); on(); };
-  const end=e=>{ e.preventDefault(); el.classList.remove('on'); off(); };
-  el.addEventListener('touchstart',start,{passive:false});
-  el.addEventListener('touchend',end,{passive:false});
-  el.addEventListener('touchcancel',end,{passive:false});
-  el.addEventListener('mousedown',start);
-  window.addEventListener('mouseup',end);
-  el.addEventListener('mouseleave',e=>{ if(el.classList.contains('on')) end(e); });
-}
-
-// movement buttons
-document.querySelectorAll('#movePad .btn').forEach(el=>{
-  const m=el.dataset.move;
-  if(m==='left')  bindHold(el, ()=>moveDir=-1, ()=>{ if(moveDir<0) moveDir=0; });
-  if(m==='right') bindHold(el, ()=>moveDir= 1, ()=>{ if(moveDir>0) moveDir=0; });
-  if(m==='jump')  bindHold(el, ()=>wantJump=true, ()=>wantJump=false);
-});
-
-// 8-direction hose ring — built dynamically
-const hoseRing=document.getElementById('hoseRing');
-DIRS.forEach((d,idx)=>{
-  const b=document.createElement('button');
-  b.className='hose-btn'; b.dataset.dir=idx;
-  b.textContent = ({U:'↑',UR:'↗',R:'→',DR:'↘',D:'↓',DL:'↙',L:'←',UL:'↖'})[d.name];
-  hoseRing.appendChild(b);
-  bindHold(b, ()=>{ sprayDir=d; }, ()=>{ if(sprayDir===d && !sprayFromKey) sprayDir=null; });
-});
-function layoutHosePad(){
-  const pad=document.getElementById('hosePad');
-  const R=Math.min(pad.clientWidth,pad.clientHeight)/2 - 26;
-  const cx=pad.clientWidth/2, cy=pad.clientHeight/2;
-  hoseRing.querySelectorAll('.hose-btn').forEach(b=>{
-    const d=DIRS[b.dataset.dir];
-    const a=d.ang*Math.PI/180;
-    b.style.left=(cx+Math.cos(a)*R)+'px';
-    b.style.top =(cy+Math.sin(a)*R)+'px';
+/* --- Analog joysticks via Pointer Events (robust touch + mouse, multi-touch) --- */
+function makeStick(el, onMove, onRelease){
+  const nub = el.querySelector('.nub');
+  let pid = null;                       // active pointer id (one finger per stick)
+  const radius = () => el.clientWidth * 0.36;   // how far the nub can travel
+  function apply(clientX, clientY){
+    const r = el.getBoundingClientRect();
+    let dx = clientX - (r.left + r.width/2);
+    let dy = clientY - (r.top  + r.height/2);
+    const max = radius(), d = Math.hypot(dx,dy) || 1;
+    if(d > max){ dx = dx/d*max; dy = dy/d*max; }
+    nub.style.transform = `translate(${dx}px,${dy}px)`;
+    onMove(dx/max, dy/max, Math.min(1, d/max));   // normalized -1..1 + magnitude
+  }
+  el.addEventListener('pointerdown', e=>{
+    if(pid!==null) return;
+    e.preventDefault();
+    pid = e.pointerId; el.setPointerCapture(pid); el.classList.add('on');
+    apply(e.clientX, e.clientY);
   });
+  el.addEventListener('pointermove', e=>{ if(e.pointerId===pid) apply(e.clientX, e.clientY); });
+  const release = e=>{
+    if(e.pointerId!==pid) return;
+    pid = null; el.classList.remove('on');
+    nub.style.transform = 'translate(0,0)';
+    onRelease();
+  };
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+  el.addEventListener('lostpointercapture', release);
 }
+
+// Left stick: drag ◀ ▶ to move, push ▲ up to jump / climb
+makeStick(document.getElementById('moveStick'),
+  (nx, ny) => {
+    moveDir  = Math.abs(nx) > 0.28 ? Math.max(-1, Math.min(1, nx*1.3)) : 0;
+    wantJump = ny < -0.5;
+  },
+  () => { moveDir = 0; wantJump = false; }
+);
+
+// Right stick: drag in ANY direction to aim + fire the hose (full 360°)
+makeStick(document.getElementById('hoseStick'),
+  (nx, ny, mag) => {
+    if(mag > 0.28){ aimAngle = Math.atan2(ny, nx); spraying = true; }
+    else spraying = false;
+  },
+  () => { spraying = false; }
+);
+
+function layoutHosePad(){ /* joysticks are self-positioning; nothing to do */ }
 
 /* ------------------------------------------------------------------ */
 /*  Input — keyboard + mouse (desktop)                                */
 /* ------------------------------------------------------------------ */
-const keyDirMap={
-  'KeyW':'U','KeyE':'UR','KeyD':'R','KeyC':'DR','KeyX':'D','KeyZ':'DL','KeyA':'L','KeyQ':'UL'
+const keyAngle={   // QWE / A·D / ZXC ring → aim angle (radians)
+  'KeyW':-Math.PI/2,'KeyE':-Math.PI/4,'KeyD':0,'KeyC':Math.PI/4,
+  'KeyX':Math.PI/2,'KeyZ':3*Math.PI/4,'KeyA':Math.PI,'KeyQ':-3*Math.PI/4
 };
 const held=new Set();
+let keyAim=false;   // is a keyboard aim key holding the hose?
 window.addEventListener('keydown',e=>{
   if(e.repeat) return;
   held.add(e.code);
@@ -867,7 +887,6 @@ window.addEventListener('keydown',e=>{
     case 'ArrowRight': moveDir=1; break;
     case 'ArrowUp': case 'Space': wantJump=true; break;
   }
-  // aim with number keys / IJKL style via ArrowKeys+shift? use QWE/ASD/ZXC ring:
   refreshKeyAim();
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
 },{passive:false});
@@ -881,33 +900,23 @@ window.addEventListener('keyup',e=>{
   refreshKeyAim();
 });
 function refreshKeyAim(){
-  // QWE / A D / ZXC surround-key aiming
-  for(const code of Object.keys(keyDirMap)){
-    if(held.has(code)){
-      const name=keyDirMap[code];
-      sprayDir=DIRS.find(d=>d.name===name); sprayFromKey=true; return;
-    }
+  for(const code in keyAngle){
+    if(held.has(code)){ aimAngle=keyAngle[code]; spraying=true; keyAim=true; return; }
   }
-  if(sprayFromKey){ sprayFromKey=false; sprayDir=null; }
+  if(keyAim){ keyAim=false; if(!mouseDown) spraying=false; }
 }
 
-// mouse aim + hold to spray (desktop convenience)
+// mouse aim + hold to spray (desktop): fires toward the exact cursor angle
 let mouseDown=false;
 cvs.addEventListener('mousedown',e=>{ mouseDown=true; aimMouse(e); });
 window.addEventListener('mousemove',e=>{ if(mouseDown) aimMouse(e); });
-window.addEventListener('mouseup',()=>{ if(mouseDown){ mouseDown=false; if(!sprayFromKey) sprayDir=null; } });
+window.addEventListener('mouseup',()=>{ if(mouseDown){ mouseDown=false; if(!keyAim) spraying=false; } });
 function aimMouse(e){
   const rect=cvs.getBoundingClientRect();
   const mx=(e.clientX-rect.left)/CELL, my=(e.clientY-rect.top)/CELL;
   const n=nozzle();
-  const ang=Math.atan2(my-n.y, mx-n.x)*180/Math.PI;
-  // snap to nearest of 8
-  let best=DIRS[0], bd=1e9;
-  for(const d of DIRS){
-    let diff=Math.abs(((d.ang-ang+540)%360)-180);
-    if(diff<bd){ bd=diff; best=d; }
-  }
-  sprayDir=best; sprayFromKey=true; // treat as latched while mouse held
+  aimAngle=Math.atan2(my-n.y, mx-n.x);   // exact 360° aim, no snapping
+  spraying=true;
 }
 
 /* ------------------------------------------------------------------ */
