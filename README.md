@@ -20,10 +20,12 @@ Vertical progress is a rhythm: **blast up to clear headroom, then climb into it.
 
 | Action | Touch | Keyboard / Mouse |
 |---|---|---|
-| Move left / right | left ◀ ▶ buttons | `A` / `D` or `←` / `→` |
-| Jump | `JUMP` button | `W`, `Space` or `↑` |
-| **Climb** a tunnel | hold `JUMP` while braced in a tunnel | hold jump |
-| Aim & fire hose (8-way) | hold a direction on the right ring | hold `Mouse`, or the `Q W E / A · D / Z X C` ring |
+| Move left / right | drag the **left stick** ◀ ▶ | `A` / `D` or `←` / `→` |
+| Jump / **Climb** a tunnel | push the **left stick** ▲ up | `W`, `Space` or `↑` |
+| Aim & fire hose (full **360°**) | drag the **right stick** any direction | hold `Mouse` (aims at cursor), or the `Q W E / A · D / Z X C` ring |
+
+Both control pads are analog **circular joysticks**. The right hose stick fires in
+whatever direction you point it — a continuous 360°, not just 8 fixed angles.
 
 - **Climbing:** holding jump while braced inside a tunnel hauls you steadily
   upward. Out in open caverns there's nothing to grip — you're back to gravity.
