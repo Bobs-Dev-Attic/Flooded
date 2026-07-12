@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#0a0a12" />
+<title>FLOODED — dig your way to the surface</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game"></canvas>
+
+    <!-- Heads up display -->
+    <div id="hud">
+      <div class="gauge" id="oxyGauge">
+        <span class="gauge-label">AIR</span>
+        <div class="bar"><div class="fill oxy" id="oxyFill"></div></div>
+      </div>
+      <div class="gauge" id="hpGauge">
+        <span class="gauge-label">LIFE</span>
+        <div class="bar"><div class="fill hp" id="hpFill"></div></div>
+      </div>
+      <div class="depth" id="depthReadout">-- m</div>
+    </div>
+
+    <!-- Left movement pad -->
+    <div id="movePad" class="pad">
+      <button class="btn dir" data-move="left"  aria-label="left">◀</button>
+      <button class="btn jump" data-move="jump" aria-label="jump">▲<span>JUMP</span></button>
+      <button class="btn dir" data-move="right" aria-label="right">▶</button>
+    </div>
+
+    <!-- Right hose pad: 8 directional spray buttons in a ring -->
+    <div id="hosePad" class="pad">
+      <div class="ring" id="hoseRing"></div>
+      <div class="hose-core">HOSE</div>
+    </div>
+
+    <!-- Overlays -->
+    <div id="overlay" class="overlay">
+      <div class="panel">
+        <h1 class="title">FLOODED</h1>
+        <p class="tag">You are trapped underground. Blast the dirt with your
+           water hose, carve tunnels in 8 directions, dodge the hazards, and
+           ride the rising water to the surface — before it drowns you.</p>
+        <ul class="hints">
+          <li><b>Move / Jump</b> — left circle pad (or A / D / W)</li>
+          <li><b>Aim &amp; spray hose</b> — right ring, hold a direction (or hold Mouse / Arrow keys)</li>
+          <li>Water drains through <b>drains</b> — but <b>clogged</b> ones make it rise</li>
+          <li>Watch for <b>rocks, gas, rodents</b> &amp; hidden cavities</li>
+          <li>Submerged too long &rarr; you run out of <b>AIR</b></li>
+        </ul>
+        <button class="start" id="startBtn">DESCEND ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>
